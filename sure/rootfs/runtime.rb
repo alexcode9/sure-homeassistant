@@ -11,6 +11,9 @@ supervisor = SureHA::Supervisor.new
 status = 1
 begin
   data = '/data'
+  %w[options.json secrets.json storage storage/.ha-initialized].each do |path|
+    raise SureHA::ConfigError, 'Persistent control paths must not be symbolic links' if File.symlink?(File.join(data, path))
+  end
   options = JSON.parse(File.read(File.join(data, 'options.json')))
   env = SureHA.environment(options, data)
   FileUtils.mkdir_p(File.join(data, 'storage'), mode: 0700)

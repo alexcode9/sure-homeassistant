@@ -15,4 +15,4 @@ WORKDIR /rails
 ENV SELF_HOSTED=true RAILS_ENV=production BINDING=0.0.0.0 PORT=3000 WEB_CONCURRENCY=1
 ENTRYPOINT ["/usr/bin/tini", "--", "bundle", "exec", "ruby", "/opt/sure-ha/runtime.rb"]
 CMD []
-HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 CMD curl --fail --silent http://127.0.0.1:3000/up >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=1250s --retries=3 CMD curl --fail --silent http://127.0.0.1:3000/up >/dev/null || exit 1
