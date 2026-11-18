@@ -1,0 +1,79 @@
+{
+  "configuration": {
+    "db_host": {
+      "name": "Db host"
+    },
+    "db_port": {
+      "name": "Db port"
+    },
+    "postgres_user": {
+      "name": "Postgres user"
+    },
+    "postgres_db": {
+      "name": "Postgres db"
+    },
+    "postgres_password": {
+      "name": "Postgres password"
+    },
+    "redis_url": {
+      "name": "Redis url"
+    },
+    "app_domain": {
+      "name": "App domain"
+    },
+    "https_proxy": {
+      "name": "Https proxy"
+    },
+    "rails_max_threads": {
+      "name": "Rails max threads"
+    },
+    "rails_ai_max_threads": {
+      "name": "Rails ai max threads"
+    },
+    "dependency_timeout": {
+      "name": "Dependency timeout"
+    },
+    "secret_key_base": {
+      "name": "Secret key base"
+    },
+    "active_record_encryption_primary_key": {
+      "name": "Active record encryption primary key"
+    },
+    "active_record_encryption_deterministic_key": {
+      "name": "Active record encryption deterministic key"
+    },
+    "active_record_encryption_key_derivation_salt": {
+      "name": "Active record encryption key derivation salt"
+    },
+    "smtp_password": {
+      "name": "Smtp password"
+    },
+    "openai_access_token": {
+      "name": "Openai access token"
+    },
+    "smtp_address": {
+      "name": "Smtp address"
+    },
+    "smtp_username": {
+      "name": "Smtp username"
+    },
+    "email_sender": {
+      "name": "Email sender"
+    },
+    "openai_model": {
+      "name": "Openai model"
+    },
+    "openai_uri_base": {
+      "name": "Openai uri base"
+    },
+    "smtp_port": {
+      "name": "Smtp port"
+    },
+    "smtp_tls_enabled": {
+      "name": "Smtp tls enabled"
+    }
+  },
+  "network": {
+    "3000/tcp": "Interfaccia web Sure"
+  }
+}

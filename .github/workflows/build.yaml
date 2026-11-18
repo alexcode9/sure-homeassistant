@@ -1,0 +1,95 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - run: python3 scripts/validate.py
+      - run: ruby tests/runtime_test.rb
+      - run: bash -n tests/smoke.sh
+      - run: shellcheck tests/smoke.sh
+      - name: Validate HA metadata
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: ./sure
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+      - name: Build native image
+        run: docker build --pull -t sure-test sure
+      - name: Isolated PostgreSQL 17 and Redis integration tests
+        run: tests/smoke.sh sure-test
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested candidate
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ghcr.io/alexcode9/sure-homeassistant
+          SHA: ${{ github.sha }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          docker tag sure-test "$IMAGE:sha-$SHA-$ARCH"
+          docker push "$IMAGE:sha-$SHA-$ARCH"
+  manifest:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Assemble only tested architectures
+        env:
+          IMAGE: ghcr.io/alexcode9/sure-homeassistant
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          tag="sha-$SHA"
+          if [[ "$REF" == refs/tags/v* ]]; then
+            version=$(python3 -c 'import json; print(json.load(open("sure/config.yaml"))["version"])')
+            test "$REF" = "refs/tags/v$version"
+            tag="$version"
+            if docker buildx imagetools inspect "$IMAGE:$tag" >/dev/null 2>&1; then
+              echo 'Version already published. Never overwrite release tags.' >&2
+              exit 1
+            fi
+          fi
+          docker buildx imagetools create -t "$IMAGE:$tag" "$IMAGE:sha-$SHA-amd64" "$IMAGE:sha-$SHA-arm64"
+          docker buildx imagetools inspect "$IMAGE:$tag"
