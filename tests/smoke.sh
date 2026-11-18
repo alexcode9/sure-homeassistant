@@ -34,7 +34,11 @@ wait_ready() {
 wait_ready
 # Both services run as rails; a real Sidekiq heartbeat exists in Redis.
 docker exec "$app" sh -c 'ps -eo user,args | grep "^rails.*sidekiq" | grep -v grep'
-docker exec "$redis" redis-cli -a test-only SCARD processes | grep -Eq '^[1-9][0-9]*$'
+for _ in $(seq 1 20); do
+  if docker exec -e REDISCLI_AUTH=test-only "$redis" redis-cli -n 1 SCARD processes | grep -Eq '^[1-9][0-9]*$'; then break; fi
+  sleep 1
+done
+docker exec -e REDISCLI_AUTH=test-only "$redis" redis-cli -n 1 SCARD processes | grep -Eq '^[1-9][0-9]*$' 
 before=$(docker exec "$app" sha256sum /data/secrets.json)
 docker exec -u rails "$app" sh -c 'echo persistent > /data/storage/test-marker'
 docker stop -t 85 "$app" >/dev/null
