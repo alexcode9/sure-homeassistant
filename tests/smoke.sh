@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 image=${1:?image}
 network="sure-test-${RANDOM}"
 app="${network}-app"
@@ -12,6 +12,7 @@ cleanup() {
   docker network rm "$network" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+trap 'echo "Smoke test failed at line $LINENO" >&2; docker logs "$app" 2>&1 | tail -100' ERR
 docker network create "$network" >/dev/null
 docker volume create "$volume" >/dev/null
 docker run -d --name "$db" --network "$network" -e POSTGRES_PASSWORD=test-only -e POSTGRES_USER=sure -e POSTGRES_DB=sure_test postgres:17 >/dev/null
@@ -24,7 +25,9 @@ PY
 docker run -d --name "$app" --network "$network" -v "$volume:/data" "$image" >/dev/null
 wait_ready() {
   for _ in $(seq 1 120); do
-    if docker exec "$app" curl -fsS http://127.0.0.1:3000/up >/dev/null 2>&1; then return 0; fi
+    if docker exec "$app" curl -fsS http://127.0.0.1:3000/up >/dev/null 2>&1 \
+      && docker exec "$app" pgrep -f '^sidekiq ' >/dev/null \
+      && docker exec "$app" pgrep -f '^puma ' >/dev/null; then return 0; fi
     if [ "$(docker inspect -f '{{.State.Running}}' "$app")" != true ]; then break; fi
     sleep 3
   done
