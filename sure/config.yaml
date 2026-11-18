@@ -10,7 +10,6 @@
   ],
   "stage": "experimental",
   "init": false,
-  "startup": "application",
   "boot": "manual",
   "timeout": 90,
   "backup": "cold",
@@ -18,7 +17,6 @@
     "3000/tcp": 1235
   },
   "webui": "http://[HOST]:[PORT:3000]",
-  "watchdog": "http://[HOST]:[PORT:3000]/up",
   "image": "ghcr.io/alexcode9/sure-homeassistant",
   "options": {
     "db_host": "",

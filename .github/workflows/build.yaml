@@ -20,7 +20,7 @@ jobs:
       - run: bash -n tests/smoke.sh
       - run: shellcheck tests/smoke.sh
       - name: Validate HA metadata
-        uses: frenck/action-addon-linter@v2
+        uses: frenck/action-addon-linter@a6f5209799381f50d9968f95803bb0f187c3ddbb
         with:
           path: ./sure
   build:
