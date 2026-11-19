@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /rails/storage && ln -s /data/storage /rails/storage
 COPY rootfs/ /opt/sure-ha/
-ARG BUILD_VERSION=0.1.1
+ARG BUILD_VERSION=0.1.2
 LABEL io.hass.name="Sure Finance" io.hass.description="Sure personal finance" \
       io.hass.type="addon" io.hass.version="${BUILD_VERSION}" \
       io.hass.arch="aarch64|amd64" \
