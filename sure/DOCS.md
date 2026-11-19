@@ -36,6 +36,14 @@ From a Tailscale-connected client, try `http://HA_TAILSCALE_IP:1235` **only when
 
 For HTTPS use a reverse proxy on a trusted host, forwarding to `http://HA_LAN_IP:1235`, preserving Host and sending `X-Forwarded-Proto: https`. Set `https_proxy: true` and `app_domain` to the public-to-your-tailnet hostname; access that HTTPS URL directly. HA's Open Web UI button remains the direct HTTP link. Restrict direct port access if relying on the proxy for TLS. The `/up` health probe intentionally remains available via HTTP.
 
+## BancoPosta / Enable Banking history backfill (0.1.2)
+
+The 0.1.2 application fix preserves the bank-accepted `date_from` across all continuation pages. It fixes the specific `dateFrom in request is not the same as in continuationKey` failure that could stop a sync after its first page. It does **not** grant permission to fetch a longer history than BancoPosta/Enable Banking allows.
+
+An account already synced with only the most recent transactions normally uses an incremental sync window on the next run. Installing 0.1.2 by itself does **not** rerun the original full-history request or recover missing transactions from January 2026.
+
+Before attempting to backfill, back up the external PostgreSQL database, the add-on's `/data` storage, and the existing bank connection settings. Inspect the provider's `provider_sync_error` debug entries for `requested_date_from` and `effective_date_from`: a later accepted date indicates an ASPSP-imposed limit. If reauthorization with historical-data access is possible, use the bank's supported flow and verify the date range and transaction count. If the bank limits the history to a recent window, import older bank statements/CSV through Sure instead; review for duplicates against already imported rows. Do not delete/recreate an account, wipe raw transaction snapshots, or reset sync markers just to force a backfill without a verified backup and a reviewed recovery procedure.
+
 ## Troubleshooting and first acceptance
 
 - Blank or invalid fields: fix options; never share raw options or secrets in logs/issues.
