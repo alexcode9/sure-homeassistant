@@ -1,10 +1,10 @@
 {
   "version": "v0.7.6-hotfix.1",
-  "commit": "4b549c6e72c98d76352cd0645bca585e012ce424",
-  "image": "ghcr.io/alexcode9/sure:sha-4b549c6e72c98d76352cd0645bca585e012ce424",
-  "digest": "sha256:f86a85267d04f9815d0ebfa9ec5ef640ed1ad5f0e92ee595518eae987e67cde5",
+  "commit": "8911a680581b338d75ed58b902ad720376354ea8",
+  "image": "ghcr.io/alexcode9/sure:sha-8911a680581b338d75ed58b902ad720376354ea8",
+  "digest": "sha256:1a507d6ff0f8e4649ce2c51473115bb4c714d7da024e739e4f6b3b46321eb1e8",
   "verified_on": "2026-11-19",
   "source_repository": "https://github.com/alexcode9/sure",
   "upstream_repository": "https://github.com/we-promise/sure",
-  "source_build": "https://github.com/alexcode9/sure/actions/runs/44525181938"
+  "source_build": "https://github.com/alexcode9/sure/actions/runs/44562262343"
 }

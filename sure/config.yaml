@@ -1,6 +1,6 @@
 {
   "name": "Sure Finance",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "slug": "sure_finance",
   "description": "Sure personal finance with supervised web and background workers",
   "url": "https://github.com/alexcode9/sure-homeassistant",
