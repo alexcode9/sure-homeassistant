@@ -57,9 +57,16 @@ jobs:
             echo "A GitHub release for $tag already exists; refusing to republish" >&2
             exit 1
           fi
-          existing="$(gh api -X GET "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null || true)"
-          if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
-            echo "Existing tag $tag points to another object/commit; refusing to move it" >&2
+          # GitHub's singular ref lookup can return a JSON null for a missing
+          # tag. Look up matching refs instead and compare the exact ref name.
+          # This prevents a false "existing tag" error on a new release.
+          existing="$(gh api -X GET "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" |
+            jq -r --arg wanted "refs/tags/$tag" '
+              [.[] | select(.ref == $wanted) | .object] | first |
+              if . == null then "" else (.type + ":" + .sha) end
+            ')"
+          if [[ -n "$existing" && "$existing" != "commit:$GITHUB_SHA" ]]; then
+            echo "Existing tag $tag points to $existing rather than commit:$GITHUB_SHA; refusing to move it" >&2
             exit 1
           fi
 
@@ -68,8 +75,16 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
-          if gh api -X GET "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+          existing="$(gh api -X GET "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" |
+            jq -r --arg wanted "refs/tags/$tag" '
+              [.[] | select(.ref == $wanted) | .object] | first |
+              if . == null then "" else (.type + ":" + .sha) end
+            ')"
+          if [[ "$existing" == "commit:$GITHUB_SHA" ]]; then
             echo "$tag already points to the verified commit; resuming release"
+          elif [[ -n "$existing" ]]; then
+            echo "Refusing to overwrite mismatched existing tag $tag ($existing)" >&2
+            exit 1
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
