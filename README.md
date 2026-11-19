@@ -1,11 +1,11 @@
 # Sure Finance for Home Assistant OS
 
-Community Home Assistant app maintained in this repository, wrapping **official [we-promise/sure](https://github.com/we-promise/sure)**. No legacy Maybe image or application fork. Experimental: container CI is required before release; on-device HAOS acceptance is still pending.
+Community Home Assistant app maintained in this repository, wrapping an immutable container image compiled from **[alexcode9/sure](https://github.com/alexcode9/sure)**, our fork of official [we-promise/sure](https://github.com/we-promise/sure). No legacy Maybe image. Experimental: container CI is required before release; on-device HAOS acceptance is still pending.
 
 - ARM64 (`aarch64`, including 64-bit Raspberry Pi) and AMD64.
 - Puma and Sidekiq run together as the unprivileged `rails` user, under a fail-fast supervisor and Tini.
 - External PostgreSQL and Redis; no bundled database and no access to Docker, host files or Supervisor API.
-- Immutable upstream image, persistent upload storage and automatically generated persistent encryption secrets.
+- Immutable, tested fork image pinned to a specific SHA256 digest; persistent upload storage and automatically generated persistent encryption secrets.
 - Port **1235**, independent of an existing Maybe installation on 1234.
 - Weekly upstream release checks open review issues. Updates are never automatically merged or deployed.
 
@@ -32,4 +32,4 @@ The smoke test creates and deletes only its randomly named test containers, netw
 
 ## License and source
 
-AGPL-3.0 (see LICENSE). The wrapper source is here; the full corresponding upstream application source is pinned in [upstream.json](upstream.json) and available at [the exact upstream commit](https://github.com/we-promise/sure/tree/4b549c6e72c98d76352cd0645bca585e012ce424). Preserve these source links when redistributing images. This is an independent community package, not an official Home Assistant or Sure product.
+AGPL-3.0 (see LICENSE). The wrapper source is here; the exact application image, source commit and fork build are recorded in [upstream.json](upstream.json). The application source is [alexcode9/sure at the pinned commit](https://github.com/alexcode9/sure/tree/4b549c6e72c98d76352cd0645bca585e012ce424), based on the [official Sure upstream commit](https://github.com/we-promise/sure/tree/4b549c6e72c98d76352cd0645bca585e012ce424). Preserve these source links when redistributing images. This is an independent community package, not an official Home Assistant or Sure product.
