@@ -1,8 +1,8 @@
 # Verified upstream contract
 
-Reviewed 2026-11-18 against official release **v0.7.6-hotfix.1**, commit `4b549c6e72c98d76352cd0645bca585e012ce424`. GHCR OCI index digest `sha256:002cde609f3af4b69ba2564c2482f3996e1fe29092dd169962b9b6ed943fcb10` contains `linux/amd64` and `linux/arm64`. The image tag omits the leading `v`.
+Original contract reviewed 2026-11-18 against official release **v0.7.6-hotfix.1**, commit `4b549c6e72c98d76352cd0645bca585e012ce424`. On 2026-11-19, [our Sure fork](https://github.com/alexcode9/sure) [built the same commit](https://github.com/alexcode9/sure/actions/runs/44525181938) with passing CI and both Linux AMD64 and ARM64 image builds. The fork OCI index digest is `sha256:f86a85267d04f9815d0ebfa9ec5ef640ed1ad5f0e92ee595518eae987e67cde5`. The pinned fork tag is `sha-4b549c6e72c98d76352cd0645bca585e012ce424`, not a mutable `latest` or `main` tag. Confirm anonymous GHCR pulls and downstream smoke tests before deploying.
 
-Primary sources (read the pinned revision when updating):
+Primary source contracts (read the exact pinned revision when updating; any future fork changes also require reviewing their diff):
 
 - [Official Dockerfile](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/Dockerfile): Debian Ruby 3.4.9, `/rails`, UID/GID 1000, Rails and dependencies already built.
 - [Compose example](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/compose.example.yml) and [Docker hosting guide](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/docs/hosting/docker.md): web + Sidekiq, external PostgreSQL/Redis, shared `/rails/storage`.
