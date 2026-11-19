@@ -1,14 +1,19 @@
-# Verified upstream contract
+# Verified application image contract — HAOS 0.1.2
 
-Original contract reviewed 2026-11-18 against official release **v0.7.6-hotfix.1**, commit `4b549c6e72c98d76352cd0645bca585e012ce424`. On 2026-11-19, [our Sure fork](https://github.com/alexcode9/sure) [built the same commit](https://github.com/alexcode9/sure/actions/runs/44525181938) with passing CI and both Linux AMD64 and ARM64 image builds. The fork OCI index digest is `sha256:f86a85267d04f9815d0ebfa9ec5ef640ed1ad5f0e92ee595518eae987e67cde5`. The pinned fork tag is `sha-4b549c6e72c98d76352cd0645bca585e012ce424`, not a mutable `latest` or `main` tag. Confirm anonymous GHCR pulls and downstream smoke tests before deploying.
+This add-on embeds Sure v0.7.6-hotfix.1 from the **limited-scope HAOS maintenance branch** [alexcode9/sure/tree/haos-0.7.6-hotfix.1](https://github.com/alexcode9/sure/tree/haos-0.7.6-hotfix.1). It is based on official source commit `4b549c6e72c98d76352cd0645bca585e012ce424` and adds only the Enable Banking/BancoPosta pagination correction (see [fork PR #2](https://github.com/alexcode9/sure/pull/2)); the maintenance publishing workflow is in [fork PR #3](https://github.com/alexcode9/sure/pull/3).
 
-Primary source contracts (read the exact pinned revision when updating; any future fork changes also require reviewing their diff):
+Application source commit: `8911a680581b338d75ed58b902ad720376354ea8`.
 
-- [Official Dockerfile](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/Dockerfile): Debian Ruby 3.4.9, `/rails`, UID/GID 1000, Rails and dependencies already built.
-- [Compose example](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/compose.example.yml) and [Docker hosting guide](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/docs/hosting/docker.md): web + Sidekiq, external PostgreSQL/Redis, shared `/rails/storage`.
-- [Database config](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/database.yml): `DB_HOST`, `DB_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
-- [Sidekiq config](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/sidekiq.yml): total `RAILS_MAX_THREADS` includes the AI capsule `RAILS_AI_MAX_THREADS`; defaults 3 and 1. Do not override upstream queues.
-- [Encryption initializer](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/initializers/active_record_encryption.rb): all three explicit encryption variables or none. This wrapper persists explicit random keys.
-- [Home Assistant current config reference](https://contributors.home-assistant.io/apps/reference/configuration/): multiarch image name without tag; version selects image tag; `/data` is persistent; cold backup stops the app. Separate app `build.yaml` is deprecated. `.github/workflows/build.yaml` is a GitHub workflow, not that deprecated file.
+Multiarch image: `ghcr.io/alexcode9/sure:sha-8911a680581b338d75ed58b902ad720376354ea8@sha256:1a507d6ff0f8e4649ce2c51473115bb4c714d7da024e739e4f6b3b46321eb1e8`.
 
-The wrapper replaces upstream ENTRYPOINT to run `db:prepare` once before either child starts. It preserves jemalloc preload. It does not invoke the upstream Compose backup sidecar: that expects Compose files and its own runtime stamp. Use the coordinated HA/external-database procedure here instead. `/up` is Rails boot health, not a full dependency or queue health check; monitor Sidekiq and integrations in Sure too.
+[Successful CI and GHCR image publication](https://github.com/alexcode9/sure/actions/runs/44562262343) confirms unit/system tests and ARM64/AMD64 Docker builds and multiarch manifest assembly. This does **not** imply a bank will permit accessing transactions earlier than its authorized historical window. A pagination cursor is tied to the ASPSP-accepted effective `date_from` and must be used consistently across pages. See `upstream.json` for machine-readable pin.
+
+## Underlying official source contract
+
+The existing wrapper architecture remains based on Sure **v0.7.6-hotfix.1**:
+
+- [Official Dockerfile](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/Dockerfile): Rails under `/rails`.
+- [Compose example](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/compose.example.yml) and [hosting guide](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/docs/hosting/docker.md): external PostgreSQL/Redis and shared `/rails/storage`.
+- [Database config](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/database.yml), [Sidekiq config](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/sidekiq.yml), and [encryption initializer](https://github.com/we-promise/sure/blob/v0.7.6-hotfix.1/config/initializers/active_record_encryption.rb).
+
+The HAOS wrapper retains its independent entrypoint, persistent /data storage, cold-backup behavior and external database. Review all changes and test coordinated backup/restore before production upgrades.
