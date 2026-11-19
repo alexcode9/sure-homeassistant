@@ -1,0 +1,164 @@
+name: Publish verified Sure Finance release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version from sure/config.yaml, e.g. 0.1.1"
+        required: true
+        type: string
+      confirmation:
+        description: "Type RELEASE followed by the version, e.g. RELEASE 0.1.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sure-finance-manual-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - name: Check out the exact main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Require explicit approval, correct version and successful main CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Run this workflow from main only" >&2; exit 1; }
+          [[ "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "Invalid release version" >&2; exit 1; }
+          [[ "$RELEASE_CONFIRMATION" == "RELEASE $RELEASE_VERSION" ]] || { echo "Confirmation must be: RELEASE $RELEASE_VERSION" >&2; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "Checked out commit differs from run commit" >&2; exit 1; }
+          declared_version="$(python3 -c 'import json; print(json.load(open("sure/config.yaml"))["version"])')"
+          [[ "$declared_version" == "$RELEASE_VERSION" ]] || { echo "sure/config.yaml declares $declared_version, not $RELEASE_VERSION" >&2; exit 1; }
+          python3 scripts/validate.py
+
+          successful_main_builds="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/build.yaml/runs?event=push&head_sha=$GITHUB_SHA&per_page=100" \
+            --jq '[.workflow_runs[] | select(.head_branch == "main" and .conclusion == "success")] | length')"
+          [[ "$successful_main_builds" -ge 1 ]] || { echo "No successful main Build and test run for commit $GITHUB_SHA" >&2; exit 1; }
+
+          tag="v$RELEASE_VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A GitHub release for $tag already exists; refusing to republish" >&2
+            exit 1
+          fi
+          existing="$(gh api -X GET "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null || true)"
+          if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
+            echo "Existing tag $tag points to another object/commit; refusing to move it" >&2
+            exit 1
+          fi
+
+      - name: Create release tag without moving existing tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          if gh api -X GET "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag already points to the verified commit; resuming release"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
+            echo "Created immutable tag $tag at $GITHUB_SHA"
+          fi
+
+      # GITHUB_TOKEN-created tags do not trigger push workflows. An explicit
+      # workflow_dispatch DOES trigger them, and preserves the tag as github.ref.
+      - name: Dispatch and verify tagged ARM64/AMD64 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          workflow_runs_url="repos/$GITHUB_REPOSITORY/actions/workflows/build.yaml/runs?event=workflow_dispatch&per_page=100"
+          existing_runs="$(gh api -X GET "$workflow_runs_url")"
+          successful_tag_run="$(jq -r --arg ref "$tag" --arg sha "$GITHUB_SHA" \
+            '[.workflow_runs[] | select(.head_branch == $ref and .head_sha == $sha and .conclusion == "success")] | first | .id // empty' <<< "$existing_runs")"
+
+          if [[ -n "$successful_tag_run" ]]; then
+            echo "Reusing successful tagged build run $successful_tag_run"
+            echo "Build: https://github.com/$GITHUB_REPOSITORY/actions/runs/$successful_tag_run" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          gh workflow run build.yaml --repo "$GITHUB_REPOSITORY" --ref "$tag"
+          echo "Dispatched Build and test for $tag"
+          run_id=""
+          for attempt in $(seq 1 210); do
+            runs="$(gh api -X GET "$workflow_runs_url")"
+            if [[ -z "$run_id" ]]; then
+              run_id="$(jq -r --arg ref "$tag" --arg sha "$GITHUB_SHA" --arg started "$started_at" \
+                '[.workflow_runs[] | select(.head_branch == $ref and .head_sha == $sha and .created_at >= $started)] | sort_by(.created_at) | last | .id // empty' <<< "$runs")"
+            fi
+
+            if [[ -n "$run_id" ]]; then
+              run="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+              status="$(jq -r '.status' <<< "$run")"
+              conclusion="$(jq -r '.conclusion // empty' <<< "$run")"
+              echo "Tagged build $run_id: status=$status conclusion=${conclusion:-pending}"
+              if [[ "$status" == completed ]]; then
+                echo "Build: https://github.com/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_STEP_SUMMARY"
+                [[ "$conclusion" == success ]] || { echo "Tagged build failed ($conclusion); release not published" >&2; exit 1; }
+                exit 0
+              fi
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for tagged build; release not published" >&2
+          exit 1
+
+      - name: Verify anonymous pull and both platforms
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+      - name: Inspect public multi-platform release image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/alexcode9/sure-homeassistant:$RELEASE_VERSION"
+          # No registry login: refuse to publish the release if users cannot pull publicly.
+          export DOCKER_CONFIG
+          DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          docker buildx imagetools inspect "$image" --raw > "$RUNNER_TEMP/sure-release-manifest.json"
+          jq -e '
+            [.manifests[]? | select(.platform.os == "linux") | .platform.architecture] as $arches
+            | (($arches | index("amd64")) != null and ($arches | index("arm64")) != null)
+          ' "$RUNNER_TEMP/sure-release-manifest.json"
+          echo "Verified anonymous access to ARM64 + AMD64: $image" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish prerelease only after successful builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$RELEASE_VERSION"
+          cat > "$RUNNER_TEMP/sure-release-notes.md" <<EOF
+          Experimental Home Assistant OS add-on release.
+
+          - Source: https://github.com/$GITHUB_REPOSITORY/tree/$GITHUB_SHA
+          - Commit: $GITHUB_SHA
+          - Multi-arch image: \`ghcr.io/alexcode9/sure-homeassistant:$RELEASE_VERSION\`
+          - Targets: linux/arm64 (Raspberry Pi 4) and linux/amd64
+          - Image built and tested with disposable PostgreSQL 17 and Redis by the tagged Build and test workflow.
+          - App image source and digest are pinned in upstream.json.
+
+          Back up the Home Assistant add-on storage and external PostgreSQL database before upgrading. Do not treat a successful container test as an on-device acceptance test.
+          EOF
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --title "Sure Finance $RELEASE_VERSION" \
+            --notes-file "$RUNNER_TEMP/sure-release-notes.md" \
+            --prerelease --verify-tag
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
